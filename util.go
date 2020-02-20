@@ -3,9 +3,10 @@ package osin
 import (
 	"encoding/base64"
 	"errors"
-	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/labstack/echo"
 )
 
 // Parse basic authentication header
@@ -33,12 +34,12 @@ func CheckClientSecret(client Client, secret string) bool {
 }
 
 // Return authorization header data
-func CheckBasicAuth(r *http.Request) (*BasicAuth, error) {
-	if r.Header.Get("Authorization") == "" {
+func CheckBasicAuth(c echo.Context) (*BasicAuth, error) {
+	if c.Request().Header.Get("Authorization") == "" {
 		return nil, nil
 	}
 
-	s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+	s := strings.SplitN(c.Request().Header.Get("Authorization"), " ", 2)
 	if len(s) != 2 || s[0] != "Basic" {
 		return nil, errors.New("Invalid authorization header")
 	}
@@ -69,9 +70,9 @@ func CheckBasicAuth(r *http.Request) (*BasicAuth, error) {
 }
 
 // Return "Bearer" token from request. The header has precedence over query string.
-func CheckBearerAuth(r *http.Request) *BearerAuth {
-	authHeader := r.Header.Get("Authorization")
-	authForm := r.FormValue("code")
+func CheckBearerAuth(c echo.Context) *BearerAuth {
+	authHeader := c.Request().Header.Get("Authorization")
+	authForm := c.FormValue("code")
 	if authHeader == "" && authForm == "" {
 		return nil
 	}
@@ -92,14 +93,19 @@ func CheckBearerAuth(r *http.Request) *BearerAuth {
 // getClientAuth checks client basic authentication in params if allowed,
 // otherwise gets it from the header.
 // Sets an error on the response if no auth is present or a server error occurs.
-func (s Server) getClientAuth(w *Response, r *http.Request, allowQueryParams bool) *BasicAuth {
+func (s Server) getClientAuth(w *Response, c echo.Context, allowQueryParams bool) *BasicAuth {
 
 	if allowQueryParams {
 		// Allow for auth without password
-		if _, hasSecret := r.Form["client_secret"]; hasSecret {
+		form, err := c.FormParams()
+		if err != nil {
+			s.setErrorAndLog(w, E_INVALID_REQUEST, err, "failed_parsing_params=%s", err)
+			return nil
+		}
+		if _, hasSecret := form["client_secret"]; hasSecret {
 			auth := &BasicAuth{
-				Username: r.FormValue("client_id"),
-				Password: r.FormValue("client_secret"),
+				Username: c.FormValue("client_id"),
+				Password: c.FormValue("client_secret"),
 			}
 			if auth.Username != "" {
 				return auth
@@ -107,7 +113,7 @@ func (s Server) getClientAuth(w *Response, r *http.Request, allowQueryParams boo
 		}
 	}
 
-	auth, err := CheckBasicAuth(r)
+	auth, err := CheckBasicAuth(c)
 	if err != nil {
 		s.setErrorAndLog(w, E_INVALID_REQUEST, err, "get_client_auth=%s", "check auth error")
 		return nil

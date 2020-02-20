@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/labstack/echo"
 )
 
 func TestResponseJSON(t *testing.T) {
@@ -19,7 +21,8 @@ func TestResponseJSON(t *testing.T) {
 	r.Output["access_token"] = "1234"
 	r.Output["token_type"] = "5678"
 
-	err = OutputJSON(r, w, req)
+	c := echo.New().NewContext(req, w)
+	err = OutputJSON(r, c)
 	if err != nil {
 		t.Fatalf("Error outputting json: %s", err)
 	}
@@ -61,7 +64,8 @@ func TestErrorResponseJSON(t *testing.T) {
 	r.ErrorStatusCode = 500
 	r.SetError(E_INVALID_REQUEST, "")
 
-	err = OutputJSON(r, w, req)
+	c := echo.New().NewContext(req, w)
+	err = OutputJSON(r, c)
 	if err != nil {
 		t.Fatalf("Error outputting json: %s", err)
 	}
@@ -98,7 +102,8 @@ func TestRedirectResponseJSON(t *testing.T) {
 	r := NewResponse(NewTestingStorage())
 	r.SetRedirect("http://localhost:14000")
 
-	err = OutputJSON(r, w, req)
+	c := echo.New().NewContext(req, w)
+	err = OutputJSON(r, c)
 	if err != nil {
 		t.Fatalf("Error outputting json: %s", err)
 	}

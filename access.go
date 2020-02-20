@@ -4,9 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
+
+	"github.com/labstack/echo"
 )
 
 // AccessRequestType is the type for OAuth param `grant_type`
@@ -51,7 +52,7 @@ type AccessRequest struct {
 	UserData interface{}
 
 	// HttpRequest *http.Request for special use
-	HttpRequest *http.Request
+	Context echo.Context
 
 	// Optional code_verifier as described in rfc7636
 	CodeVerifier string
@@ -111,37 +112,31 @@ type AccessTokenGen interface {
 }
 
 // HandleAccessRequest is the http.HandlerFunc for handling access token requests
-func (s *Server) HandleAccessRequest(w *Response, r *http.Request) *AccessRequest {
+func (s *Server) HandleAccessRequest(w *Response, c echo.Context) *AccessRequest {
 	// Only allow GET or POST
-	if r.Method == "GET" {
+	if c.Request().Method == "GET" {
 		if !s.Config.AllowGetAccessRequest {
 			s.setErrorAndLog(w, E_INVALID_REQUEST, errors.New("Request must be POST"), "access_request=%s", "GET request not allowed")
 			return nil
 		}
-	} else if r.Method != "POST" {
+	} else if c.Request().Method != "POST" {
 		s.setErrorAndLog(w, E_INVALID_REQUEST, errors.New("Request must be POST"), "access_request=%s", "request must be POST")
 		return nil
 	}
 
-	err := r.ParseForm()
-	if err != nil {
-		s.setErrorAndLog(w, E_INVALID_REQUEST, err, "access_request=%s", "parsing error")
-		return nil
-	}
-
-	grantType := AccessRequestType(r.FormValue("grant_type"))
+	grantType := AccessRequestType(c.FormValue("grant_type"))
 	if s.Config.AllowedAccessTypes.Exists(grantType) {
 		switch grantType {
 		case AUTHORIZATION_CODE:
-			return s.handleAuthorizationCodeRequest(w, r)
+			return s.handleAuthorizationCodeRequest(w, c)
 		case REFRESH_TOKEN:
-			return s.handleRefreshTokenRequest(w, r)
+			return s.handleRefreshTokenRequest(w, c)
 		case PASSWORD:
-			return s.handlePasswordRequest(w, r)
+			return s.handlePasswordRequest(w, c)
 		case CLIENT_CREDENTIALS:
-			return s.handleClientCredentialsRequest(w, r)
+			return s.handleClientCredentialsRequest(w, c)
 		case ASSERTION:
-			return s.handleAssertionRequest(w, r)
+			return s.handleAssertionRequest(w, c)
 		}
 	}
 
@@ -149,9 +144,9 @@ func (s *Server) HandleAccessRequest(w *Response, r *http.Request) *AccessReques
 	return nil
 }
 
-func (s *Server) handleAuthorizationCodeRequest(w *Response, r *http.Request) *AccessRequest {
+func (s *Server) handleAuthorizationCodeRequest(w *Response, c echo.Context) *AccessRequest {
 	// get client authentication
-	auth := s.getClientAuth(w, r, s.Config.AllowClientSecretInParams)
+	auth := s.getClientAuth(w, c, s.Config.AllowClientSecretInParams)
 	if auth == nil {
 		return nil
 	}
@@ -159,12 +154,12 @@ func (s *Server) handleAuthorizationCodeRequest(w *Response, r *http.Request) *A
 	// generate access token
 	ret := &AccessRequest{
 		Type:            AUTHORIZATION_CODE,
-		Code:            r.FormValue("code"),
-		CodeVerifier:    r.FormValue("code_verifier"),
-		RedirectUri:     r.FormValue("redirect_uri"),
+		Code:            c.FormValue("code"),
+		CodeVerifier:    c.FormValue("code_verifier"),
+		RedirectUri:     c.FormValue("redirect_uri"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		Context:         c,
 	}
 
 	// "code" is required
@@ -283,9 +278,9 @@ func extraScopes(access_scopes, refresh_scopes string) bool {
 	return false
 }
 
-func (s *Server) handleRefreshTokenRequest(w *Response, r *http.Request) *AccessRequest {
+func (s *Server) handleRefreshTokenRequest(w *Response, c echo.Context) *AccessRequest {
 	// get client authentication
-	auth := s.getClientAuth(w, r, s.Config.AllowClientSecretInParams)
+	auth := s.getClientAuth(w, c, s.Config.AllowClientSecretInParams)
 	if auth == nil {
 		return nil
 	}
@@ -293,11 +288,11 @@ func (s *Server) handleRefreshTokenRequest(w *Response, r *http.Request) *Access
 	// generate access token
 	ret := &AccessRequest{
 		Type:            REFRESH_TOKEN,
-		Code:            r.FormValue("refresh_token"),
-		Scope:           r.FormValue("scope"),
+		Code:            c.FormValue("refresh_token"),
+		Scope:           c.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		Context:         c,
 	}
 
 	// "refresh_token" is required
@@ -354,9 +349,9 @@ func (s *Server) handleRefreshTokenRequest(w *Response, r *http.Request) *Access
 	return ret
 }
 
-func (s *Server) handlePasswordRequest(w *Response, r *http.Request) *AccessRequest {
+func (s *Server) handlePasswordRequest(w *Response, c echo.Context) *AccessRequest {
 	// get client authentication
-	auth := s.getClientAuth(w, r, s.Config.AllowClientSecretInParams)
+	auth := s.getClientAuth(w, c, s.Config.AllowClientSecretInParams)
 	if auth == nil {
 		return nil
 	}
@@ -364,12 +359,12 @@ func (s *Server) handlePasswordRequest(w *Response, r *http.Request) *AccessRequ
 	// generate access token
 	ret := &AccessRequest{
 		Type:            PASSWORD,
-		Username:        r.FormValue("username"),
-		Password:        r.FormValue("password"),
-		Scope:           r.FormValue("scope"),
+		Username:        c.FormValue("username"),
+		Password:        c.FormValue("password"),
+		Scope:           c.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		Context:         c,
 	}
 
 	// "username" and "password" is required
@@ -389,9 +384,9 @@ func (s *Server) handlePasswordRequest(w *Response, r *http.Request) *AccessRequ
 	return ret
 }
 
-func (s *Server) handleClientCredentialsRequest(w *Response, r *http.Request) *AccessRequest {
+func (s *Server) handleClientCredentialsRequest(w *Response, c echo.Context) *AccessRequest {
 	// get client authentication
-	auth := s.getClientAuth(w, r, s.Config.AllowClientSecretInParams)
+	auth := s.getClientAuth(w, c, s.Config.AllowClientSecretInParams)
 	if auth == nil {
 		return nil
 	}
@@ -399,10 +394,10 @@ func (s *Server) handleClientCredentialsRequest(w *Response, r *http.Request) *A
 	// generate access token
 	ret := &AccessRequest{
 		Type:            CLIENT_CREDENTIALS,
-		Scope:           r.FormValue("scope"),
+		Scope:           c.FormValue("scope"),
 		GenerateRefresh: false,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		Context:         c,
 	}
 
 	// must have a valid client
@@ -416,9 +411,9 @@ func (s *Server) handleClientCredentialsRequest(w *Response, r *http.Request) *A
 	return ret
 }
 
-func (s *Server) handleAssertionRequest(w *Response, r *http.Request) *AccessRequest {
+func (s *Server) handleAssertionRequest(w *Response, c echo.Context) *AccessRequest {
 	// get client authentication
-	auth := s.getClientAuth(w, r, s.Config.AllowClientSecretInParams)
+	auth := s.getClientAuth(w, c, s.Config.AllowClientSecretInParams)
 	if auth == nil {
 		return nil
 	}
@@ -426,12 +421,12 @@ func (s *Server) handleAssertionRequest(w *Response, r *http.Request) *AccessReq
 	// generate access token
 	ret := &AccessRequest{
 		Type:            ASSERTION,
-		Scope:           r.FormValue("scope"),
-		AssertionType:   r.FormValue("assertion_type"),
-		Assertion:       r.FormValue("assertion"),
+		Scope:           c.FormValue("scope"),
+		AssertionType:   c.FormValue("assertion_type"),
+		Assertion:       c.FormValue("assertion"),
 		GenerateRefresh: false, // assertion should NOT generate a refresh token, per the RFC
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		Context:         c,
 	}
 
 	// "assertion_type" and "assertion" is required
@@ -451,12 +446,12 @@ func (s *Server) handleAssertionRequest(w *Response, r *http.Request) *AccessReq
 	return ret
 }
 
-func (s *Server) FinishAccessRequest(w *Response, r *http.Request, ar *AccessRequest) {
+func (s *Server) FinishAccessRequest(w *Response, c echo.Context, ar *AccessRequest) {
 	// don't process if is already an error
 	if w.IsError {
 		return
 	}
-	redirectUri := r.FormValue("redirect_uri")
+	redirectUri := c.FormValue("redirect_uri")
 	// Get redirect uri from AccessRequest if it's there (e.g., refresh token request)
 	if ar.RedirectUri != "" {
 		redirectUri = ar.RedirectUri

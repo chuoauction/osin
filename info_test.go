@@ -2,8 +2,11 @@ package osin
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/labstack/echo"
 )
 
 func TestInfo(t *testing.T) {
@@ -18,8 +21,10 @@ func TestInfo(t *testing.T) {
 	req.Form = make(url.Values)
 	req.Form.Set("code", "9999")
 
-	if ar := server.HandleInfoRequest(resp, req); ar != nil {
-		server.FinishInfoRequest(resp, req, ar)
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleInfoRequest(resp, c); ar != nil {
+		server.FinishInfoRequest(resp, c, ar)
 	}
 
 	if resp.IsError && resp.InternalError != nil {
@@ -50,8 +55,10 @@ func TestInfoWhenCodeIsOnHeader(t *testing.T) {
 	}
 	req.Header.Set("Authorization", "Bearer 9999")
 
-	if ar := server.HandleInfoRequest(resp, req); ar != nil {
-		server.FinishInfoRequest(resp, req, ar)
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleInfoRequest(resp, c); ar != nil {
+		server.FinishInfoRequest(resp, c, ar)
 	}
 
 	if resp.IsError && resp.InternalError != nil {

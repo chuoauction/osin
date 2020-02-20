@@ -2,9 +2,12 @@ package osin
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/labstack/echo"
 )
 
 func TestAccessAuthorizationCode(t *testing.T) {
@@ -26,9 +29,11 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	req.Form.Set("state", "a")
 	req.PostForm = make(url.Values)
 
-	if ar := server.HandleAccessRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAccessRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAccessRequest(resp, req, ar)
+		server.FinishAccessRequest(resp, c, ar)
 	}
 
 	//fmt.Printf("%+v", resp)
@@ -73,9 +78,11 @@ func TestAccessRefreshToken(t *testing.T) {
 	req.Form.Set("state", "a")
 	req.PostForm = make(url.Values)
 
-	if ar := server.HandleAccessRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAccessRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAccessRequest(resp, req, ar)
+		server.FinishAccessRequest(resp, c, ar)
 	}
 	//fmt.Printf("%+v", resp)
 
@@ -124,9 +131,11 @@ func TestAccessRefreshTokenSaveToken(t *testing.T) {
 	req.Form.Set("state", "a")
 	req.PostForm = make(url.Values)
 
-	if ar := server.HandleAccessRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAccessRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAccessRequest(resp, req, ar)
+		server.FinishAccessRequest(resp, c, ar)
 	}
 	//fmt.Printf("%+v", resp)
 
@@ -175,9 +184,11 @@ func TestAccessPassword(t *testing.T) {
 	req.Form.Set("state", "a")
 	req.PostForm = make(url.Values)
 
-	if ar := server.HandleAccessRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAccessRequest(resp, c); ar != nil {
 		ar.Authorized = ar.Username == "testing" && ar.Password == "testing"
-		server.FinishAccessRequest(resp, req, ar)
+		server.FinishAccessRequest(resp, c, ar)
 	}
 
 	//fmt.Printf("%+v", resp)
@@ -221,9 +232,11 @@ func TestAccessClientCredentials(t *testing.T) {
 	req.Form.Set("state", "a")
 	req.PostForm = make(url.Values)
 
-	if ar := server.HandleAccessRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAccessRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAccessRequest(resp, req, ar)
+		server.FinishAccessRequest(resp, c, ar)
 	}
 
 	//fmt.Printf("%+v", resp)
@@ -467,9 +480,11 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		req.Form.Set("code_verifier", test.Verifier)
 		req.PostForm = make(url.Values)
 
-		if ar := server.HandleAccessRequest(resp, req); ar != nil {
+		w := httptest.NewRecorder()
+		c := echo.New().NewContext(req, w)
+		if ar := server.HandleAccessRequest(resp, c); ar != nil {
 			ar.Authorized = true
-			server.FinishAccessRequest(resp, req, ar)
+			server.FinishAccessRequest(resp, c, ar)
 		}
 
 		if resp.IsError {

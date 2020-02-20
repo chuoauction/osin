@@ -1,8 +1,9 @@
 package osin
 
 import (
-	"net/http"
 	"time"
+
+	"github.com/labstack/echo"
 )
 
 // InfoRequest is a request for information about some AccessData
@@ -13,9 +14,8 @@ type InfoRequest struct {
 
 // HandleInfoRequest is an http.HandlerFunc for server information
 // NOT an RFC specification.
-func (s *Server) HandleInfoRequest(w *Response, r *http.Request) *InfoRequest {
-	r.ParseForm()
-	bearer := CheckBearerAuth(r)
+func (s *Server) HandleInfoRequest(w *Response, c echo.Context) *InfoRequest {
+	bearer := CheckBearerAuth(c)
 	if bearer == nil {
 		s.setErrorAndLog(w, E_INVALID_REQUEST, nil, "handle_info_request=%s", "bearer is nil")
 		return nil
@@ -60,7 +60,7 @@ func (s *Server) HandleInfoRequest(w *Response, r *http.Request) *InfoRequest {
 }
 
 // FinishInfoRequest finalizes the request handled by HandleInfoRequest
-func (s *Server) FinishInfoRequest(w *Response, r *http.Request, ir *InfoRequest) {
+func (s *Server) FinishInfoRequest(w *Response, c echo.Context, ir *InfoRequest) {
 	// don't process if is already an error
 	if w.IsError {
 		return

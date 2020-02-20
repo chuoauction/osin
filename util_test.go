@@ -2,8 +2,11 @@ package osin
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/labstack/echo"
 )
 
 const (
@@ -17,14 +20,16 @@ const (
 func TestBasicAuth(t *testing.T) {
 	r := &http.Request{Header: make(http.Header)}
 
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(r, w)
 	// Without any header
-	if b, err := CheckBasicAuth(r); b != nil || err != nil {
+	if b, err := CheckBasicAuth(c); b != nil || err != nil {
 		t.Errorf("Validated basic auth without header")
 	}
 
 	// with invalid header
 	r.Header.Set("Authorization", badAuthValue)
-	b, err := CheckBasicAuth(r)
+	b, err := CheckBasicAuth(c)
 	if b != nil || err == nil {
 		t.Errorf("Validated invalid auth")
 		return
@@ -32,7 +37,7 @@ func TestBasicAuth(t *testing.T) {
 
 	// with invalid username
 	r.Header.Set("Authorization", badUsernameInAuthValue)
-	b, err = CheckBasicAuth(r)
+	b, err = CheckBasicAuth(c)
 	if b != nil || err == nil {
 		t.Errorf("Validated invalid auth with bad username")
 		return
@@ -40,7 +45,7 @@ func TestBasicAuth(t *testing.T) {
 
 	// with invalid username
 	r.Header.Set("Authorization", badPasswordInAuthValue)
-	b, err = CheckBasicAuth(r)
+	b, err = CheckBasicAuth(c)
 	if b != nil || err == nil {
 		t.Errorf("Validated invalid auth with bad password")
 		return
@@ -48,7 +53,7 @@ func TestBasicAuth(t *testing.T) {
 
 	// with valid header
 	r.Header.Set("Authorization", goodAuthValue)
-	b, err = CheckBasicAuth(r)
+	b, err = CheckBasicAuth(c)
 	if b == nil || err != nil {
 		t.Errorf("Could not extract basic auth")
 		return
@@ -107,7 +112,9 @@ func TestGetClientAuth(t *testing.T) {
 		w := new(Response)
 		r := &http.Request{Header: tt.header, URL: tt.url}
 		r.ParseForm()
-		auth := server.getClientAuth(w, r, tt.allowQueryParams)
+		hw := httptest.NewRecorder()
+		c := echo.New().NewContext(r, hw)
+		auth := server.getClientAuth(w, c, tt.allowQueryParams)
 		if tt.expectAuth && auth == nil {
 			t.Errorf("Auth should not be nil for %v", tt)
 		} else if !tt.expectAuth && auth != nil {
@@ -119,15 +126,16 @@ func TestGetClientAuth(t *testing.T) {
 
 func TestBearerAuth(t *testing.T) {
 	r := &http.Request{Header: make(http.Header)}
-
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(r, w)
 	// Without any header
-	if b := CheckBearerAuth(r); b != nil {
+	if b := CheckBearerAuth(c); b != nil {
 		t.Errorf("Validated bearer auth without header")
 	}
 
 	// with invalid header
 	r.Header.Set("Authorization", badAuthValue)
-	b := CheckBearerAuth(r)
+	b := CheckBearerAuth(c)
 	if b != nil {
 		t.Errorf("Validated invalid auth")
 		return
@@ -135,7 +143,7 @@ func TestBearerAuth(t *testing.T) {
 
 	// with valid header
 	r.Header.Set("Authorization", goodBearerAuthValue)
-	b = CheckBearerAuth(r)
+	b = CheckBearerAuth(c)
 	if b == nil {
 		t.Errorf("Could not extract bearer auth")
 		return
@@ -150,7 +158,8 @@ func TestBearerAuth(t *testing.T) {
 	url, _ := url.Parse("http://host.tld/path?code=XYZ")
 	r = &http.Request{URL: url}
 	r.ParseForm()
-	b = CheckBearerAuth(r)
+	c = echo.New().NewContext(r, w)
+	b = CheckBearerAuth(c)
 	if b.Code != "XYZ" {
 		t.Errorf("Error decoding bearer auth")
 	}

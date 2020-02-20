@@ -2,9 +2,12 @@ package osin
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/labstack/echo"
 )
 
 func TestAuthorizeCode(t *testing.T) {
@@ -23,9 +26,11 @@ func TestAuthorizeCode(t *testing.T) {
 	req.Form.Set("client_id", "1234")
 	req.Form.Set("state", "a")
 
-	if ar := server.HandleAuthorizeRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAuthorizeRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAuthorizeRequest(resp, req, ar)
+		server.FinishAuthorizeRequest(resp, c, ar)
 	}
 
 	//fmt.Printf("%+v", resp)
@@ -64,9 +69,11 @@ func TestAuthorizeToken(t *testing.T) {
 	req.Form.Set("client_id", "1234")
 	req.Form.Set("state", "a")
 
-	if ar := server.HandleAuthorizeRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAuthorizeRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAuthorizeRequest(resp, req, ar)
+		server.FinishAuthorizeRequest(resp, c, ar)
 	}
 
 	//fmt.Printf("%+v", resp)
@@ -107,9 +114,11 @@ func TestAuthorizeTokenWithInvalidClient(t *testing.T) {
 	req.Form.Set("state", "a")
 	req.Form.Set("redirect_uri", redirectUri)
 
-	if ar := server.HandleAuthorizeRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAuthorizeRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAuthorizeRequest(resp, req, ar)
+		server.FinishAuthorizeRequest(resp, c, ar)
 	}
 
 	if !resp.IsError {
@@ -145,9 +154,12 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		req.Form.Set("response_type", string(CODE))
 		req.Form.Set("state", "a")
 		req.Form.Set("client_id", "public-client")
-		if ar := server.HandleAuthorizeRequest(resp, req); ar != nil {
+
+		w := httptest.NewRecorder()
+		c := echo.New().NewContext(req, w)
+		if ar := server.HandleAuthorizeRequest(resp, c); ar != nil {
 			ar.Authorized = true
-			server.FinishAuthorizeRequest(resp, req, ar)
+			server.FinishAuthorizeRequest(resp, c, ar)
 		}
 		if !resp.IsError || resp.ErrorId != "invalid_request" || strings.Contains(resp.StatusText, "code_challenge") {
 			t.Errorf("Expected invalid_request error describing the code_challenge required, got %#v", resp)
@@ -165,9 +177,12 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		req.Form.Set("response_type", string(CODE))
 		req.Form.Set("state", "a")
 		req.Form.Set("client_id", "1234")
-		if ar := server.HandleAuthorizeRequest(resp, req); ar != nil {
+
+		w := httptest.NewRecorder()
+		c := echo.New().NewContext(req, w)
+		if ar := server.HandleAuthorizeRequest(resp, c); ar != nil {
 			ar.Authorized = true
-			server.FinishAuthorizeRequest(resp, req, ar)
+			server.FinishAuthorizeRequest(resp, c, ar)
 		}
 		if resp.IsError && resp.InternalError != nil {
 			t.Fatalf("Error in response: %s", resp.InternalError)
@@ -203,9 +218,11 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	req.Form.Set("state", "a")
 	req.Form.Set("code_challenge", challenge)
 
-	if ar := server.HandleAuthorizeRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAuthorizeRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAuthorizeRequest(resp, req, ar)
+		server.FinishAuthorizeRequest(resp, c, ar)
 	}
 
 	//fmt.Printf("%+v", resp)
@@ -259,9 +276,11 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	req.Form.Set("code_challenge", challenge)
 	req.Form.Set("code_challenge_method", "S256")
 
-	if ar := server.HandleAuthorizeRequest(resp, req); ar != nil {
+	w := httptest.NewRecorder()
+	c := echo.New().NewContext(req, w)
+	if ar := server.HandleAuthorizeRequest(resp, c); ar != nil {
 		ar.Authorized = true
-		server.FinishAuthorizeRequest(resp, req, ar)
+		server.FinishAuthorizeRequest(resp, c, ar)
 	}
 
 	//fmt.Printf("%+v", resp)
