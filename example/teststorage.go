@@ -3,7 +3,7 @@ package example
 import (
 	"fmt"
 
-	"github.com/openshift/osin"
+	"github.com/lixin9311/osin"
 )
 
 type TestStorage struct {

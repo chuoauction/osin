@@ -521,7 +521,7 @@ func (s *Server) FinishAccessRequest(w *Response, c echo.Context, ar *AccessRequ
 
 // getClient looks up and authenticates the basic auth using the given
 // storage. Sets an error on the response if auth fails or a server error occurs.
-func (s Server) getClient(auth *BasicAuth, storage Storage, w *Response) Client {
+func (s *Server) getClient(auth *BasicAuth, storage Storage, w *Response) Client {
 	client, err := storage.GetClient(auth.Username)
 	if err == ErrNotFound {
 		s.setErrorAndLog(w, E_UNAUTHORIZED_CLIENT, nil, "get_client=%s", "not found")
@@ -549,11 +549,16 @@ func (s Server) getClient(auth *BasicAuth, storage Storage, w *Response) Client 
 }
 
 // setErrorAndLog sets the response error and internal error (if non-nil) and logs them along with the provided debug format string and arguments.
-func (s Server) setErrorAndLog(w *Response, responseError string, internalError error, debugFormat string, debugArgs ...interface{}) {
+func (s *Server) setErrorAndLog(w *Response, responseError string, internalError error, debugFormat string, debugArgs ...interface{}) {
 	format := "error=%v, internal_error=%#v " + debugFormat
 
 	w.InternalError = internalError
 	w.SetError(responseError, "")
 
+	s.Logger.Printf(format, append([]interface{}{responseError, internalError}, debugArgs...)...)
+}
+
+func (s *Server) logError(responseError string, internalError error, debugFormat string, debugArgs ...interface{}) {
+	format := "error=%v, internal_error=%#v " + debugFormat
 	s.Logger.Printf(format, append([]interface{}{responseError, internalError}, debugArgs...)...)
 }
